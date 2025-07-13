@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Resume | Khoa Nguyen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: "Modern Professional" - A palette of Slate Gray, neutral grays, white, and a sharp Teal accent for interactivity and focus points. -->
+    <!-- Application Structure Plan: A single-page application with a fixed top navigation bar for seamless scrolling between thematic sections: Overview, Experience, Skills, and Education. This structure transforms the linear resume into an exploratory dashboard. The key interaction is a horizontal timeline in the 'Experience' section, which allows users to click through Khoa's career history and view details on demand. This is more engaging than a static list and highlights career progression effectively. -->
+    <!-- Visualization & Content Choices: 
+        - Career Progression -> Goal: Compare duration and sequence of roles -> Viz: Interactive horizontal timeline (HTML/CSS) -> Interaction: On-click reveals detailed job descriptions in a dedicated card. Justification: Intuitively represents a career path and encourages user interaction. Method: Vanilla JS and Tailwind CSS.
+        - Technical Skills -> Goal: Organize and display a wide range of skills -> Viz: Polar Area Chart -> Interaction: Category filter buttons redraw the chart to show specific skill sets (languages, frameworks, etc.). Justification: More visually engaging than a list and allows for digestible, user-controlled data exploration. Library: Chart.js (Canvas).
+        - General Content -> Goal: Inform -> Viz: Styled cards and text blocks. Justification: Clean, organized, and easy to read. Method: HTML/Tailwind CSS.
+        - Resume Summary Enhancement -> Goal: Provide alternative, impactful summaries -> Viz: Text replacement -> Interaction: Button click triggers LLM call to rewrite summary. Justification: Offers quick content iteration for different applications. Method: Gemini API (gemini-2.0-flash).
+        - Achievement Rewriter -> Goal: Improve individual achievement bullet points -> Viz: Modal display of rewritten text -> Interaction: Button click triggers LLM call to rewrite specific bullet. Justification: Helps users refine their accomplishments with stronger language. Method: Gemini API (gemini-2.0-flash).
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .nav-link.active {
+            color: #0d9488;
+            border-bottom-color: #0d9488;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .timeline-item.active {
+            background-color: #0d9488;
+            color: white;
+        }
+        .timeline-item.active .timeline-date {
+            color: #ccfbf1;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="text-slate-700">
+
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-50 border-b border-slate-200">
+        <nav class="container mx-auto px-4 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <h1 class="text-xl font-bold text-slate-800">Khoa Nguyen</h1>
+                <div class="hidden md:flex space-x-8">
+                    <a href="#overview" class="nav-link text-slate-600 hover:text-teal-600 font-medium border-b-2 border-transparent transition-colors duration-300">Overview</a>
+                    <a href="#experience" class="nav-link text-slate-600 hover:text-teal-600 font-medium border-b-2 border-transparent transition-colors duration-300">Experience</a>
+                    <a href="#skills" class="nav-link text-slate-600 hover:text-teal-600 font-medium border-b-2 border-transparent transition-colors duration-300">Skills</a>
+                    <a href="#education" class="nav-link text-slate-600 hover:text-teal-600 font-medium border-b-2 border-transparent transition-colors duration-300">Education & Certs</a>
+                </div>
+                <div class="md:hidden">
+                    <select id="mobile-nav" class="bg-slate-100 border border-slate-300 rounded-md p-2 text-slate-700 focus:ring-2 focus:ring-teal-500">
+                        <option value="#overview">Overview</option>
+                        <option value="#experience">Experience</option>
+                        <option value="#skills">Skills</option>
+                        <option value="#education">Education & Certs</option>
+                    </select>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-4 lg:px-8 py-8 md:py-12">
+        <section id="overview" class="min-h-[calc(100vh-4rem)] flex flex-col justify-center py-16">
+            <div class="max-w-4xl mx-auto text-center">
+                <h2 class="text-4xl md:text-6xl font-bold tracking-tight text-slate-900">Senior Software Engineer</h2>
+                <p id="summary-text" class="mt-6 text-lg leading-8 text-slate-600">
+                    Highly accomplished Senior Software Engineer with over a decade of expertise in designing, developing, and deploying robust, high-performance software solutions. Currently at Amazon, specializing in advancing Kindle E-Reader capabilities through high-performance algorithms and rigorous QA strategies. Proven leader in full-stack development (Node.js, .NET, React.js), architectural design, and fostering technical growth within teams. Passionate about leveraging Generative AI, CI/CD, and innovative tool development to deliver scalable, high-quality, and business-aligned solutions.
+                </p>
+                <div class="mt-10 flex items-center justify-center gap-x-6">
+                    <a href="mailto:khoa.nguyen.4783@gmail.com" class="rounded-md bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 transition-colors">Contact Me</a>
+                    <a href="https://www.linkedin.com/in/khoanguyense" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold leading-6 text-slate-900 hover:text-slate-700 transition-colors">LinkedIn Profile <span aria-hidden="true">→</span></a>
+                    <button id="generate-summary-btn" class="rounded-md bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-purple-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 transition-colors">Generate New Summary ✨</button>
+                </div>
+                <p id="summary-loading" class="text-slate-500 mt-4 hidden">Generating summary...</p>
+            </div>
+        </section>
+
+        <section id="experience" class="py-16 md:py-24">
+            <div class="max-w-5xl mx-auto">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Career Journey</h2>
+                    <p class="mt-4 text-lg text-slate-600">An interactive timeline of my professional experience. Click on any role to see the details.</p>
+                </div>
+                <div id="timeline-container" class="w-full overflow-x-auto pb-4 mb-8">
+                    <div class="flex space-x-4 md:space-x-0 md:grid md:grid-cols-4 md:gap-2">
+                    </div>
+                </div>
+                <div id="experience-details" class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-slate-200 min-h-[20rem] transition-all duration-500">
+                </div>
+            </div>
+        </section>
+
+        <section id="skills" class="py-16 md:py-24 bg-slate-50 rounded-2xl">
+            <div class="max-w-5xl mx-auto">
+                 <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Technical Skills</h2>
+                    <p class="mt-4 text-lg text-slate-600">A visual representation of my key technical abilities. Select a category to explore.</p>
+                </div>
+                <div id="skills-filter" class="flex flex-wrap justify-center gap-2 mb-8">
+                </div>
+                <div class="chart-container">
+                    <canvas id="skillsChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section id="education" class="py-16 md:py-24">
+            <div class="max-w-5xl mx-auto">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Education & Certifications</h2>
+                    <p class="mt-4 text-lg text-slate-600">My academic background, professional certifications, and awards.</p>
+                </div>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-800 mb-4">Education</h3>
+                        <div id="education-list" class="space-y-4"></div>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-800 mb-4">Certifications & Awards</h3>
+                        <div id="certs-list" class="space-y-4"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <footer class="bg-white border-t border-slate-200">
+        <div class="container mx-auto py-6 px-4 lg:px-8 text-center text-slate-500">
+            <p>&copy; 2024 Khoa Nguyen. Interactive resume created with modern web technologies.</p>
+        </div>
+    </footer>
+
+    <div id="rewriteModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h3 class="text-xl font-bold text-slate-800 mb-4">Rewritten Achievement</h3>
+            <p id="rewritten-text" class="text-slate-700 mb-4"></p>
+            <p id="rewrite-loading" class="text-slate-500 hidden">Rewriting...</p>
+            <button id="copy-rewritten-text-btn" class="rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-500 transition-colors">Copy to Clipboard</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const resumeData = {
+                experience: [
+                    {
+                        company: 'Amazon',
+                        role: 'Senior Software Engineer',
+                        duration: 'Jan 2025 – Present',
+                        location: 'San Jose, CA',
+                        details: [
+                            'Spearheaded critical feature development for the Kindle E-Reader, significantly enhancing user engagement and product functionality.',
+                            'Designed and executed a robust Quality Assurance (QA) strategy, ensuring high-quality software releases and minimizing post-launch defects.',
+                            'Implemented high-performance algorithms to resolve complex technical challenges, optimizing system efficiency and responsiveness.',
+                            'Mentored and guided junior engineers, fostering their professional growth and contributing to overall team success.'
+                        ]
+                    },
+                    {
+                        company: 'All-in-1',
+                        role: 'Principal Software Engineer',
+                        duration: 'Nov 2016 – Jan 2025',
+                        location: 'Greater Los Angeles Area',
+                        details: [
+                            'Led comprehensive full-stack development initiatives using Node.js, .NET Framework, and React.js, resulting in enhanced application performance and user experience.',
+                            'Architected and implemented scalable, maintainable software solutions, significantly improving system reliability and reducing technical debt.',
+                            'Developed innovative internal tools, including custom code generators and NuGet packages, which streamlined the software development process and increased team productivity.'
+                        ]
+                    },
+                    {
+                        company: 'Scopic Software',
+                        role: 'Technical Lead',
+                        duration: 'May 2011 – Jun 2014',
+                        location: 'Ho Chi Minh, Vietnam',
+                        details: [
+                            'Directed back-end development for a robust SaaS application, leveraging ASP.NET MVC, Web API, Redis, MongoDB, and MS SQL.',
+                            'Collaborated directly with clients to translate complex business requirements into clear technical architecture, ensuring successful project delivery.',
+                            'Authored comprehensive project documentation and provided effective mentorship to team members, enhancing their technical skills and project contributions.'
+                        ]
+                    },
+                    {
+                        company: 'KMS Technology, Inc.',
+                        role: 'Software Engineer',
+                        duration: 'Sep 2009 – May 2011',
+                        location: 'Ho Chi Minh, Vietnam',
+                        details: [
+                            'Developed innovative software solutions using WPF, ASP.NET MVC, and Entity Framework.',
+                            'Partnered with the Technical Architect to design robust software architecture, enhancing product scalability and future-proofing.',
+                            'Mentored junior team members, fostering a culture of knowledge sharing through structured training seminars.'
+                        ]
+                    }
+                ],
+                skills: {
+                    'Languages': { labels: ['C#', 'JavaScript', 'TypeScript', 'Python', 'SQL', 'C++'], data: [95, 90, 85, 80, 90, 75] },
+                    'Frameworks': { labels: ['.NET', 'ASP.NET MVC', 'Web API', 'Node.js', 'React.js', 'WPF'], data: [95, 90, 92, 88, 85, 80] },
+                    'Databases': { labels: ['MS SQL', 'MongoDB', 'Redis'], data: [95, 85, 80] },
+                    'Cloud & DevOps': { labels: ['CI/CD', 'NuGet', 'AWS (General)', 'Linux'], data: [90, 85, 80, 85] },
+                    'Methodologies': { labels: ['Agile/Scrum', 'Architecture', 'GenAI', 'QA Strategy'], data: [95, 95, 80, 90] }
+                },
+                education: [
+                    { degree: 'Master of Software Engineering', university: 'International Technological University', years: '2014-2016' },
+                    { degree: 'Bachelor of Information Technology', university: 'RMIT University', years: '2007-2009' },
+                    { degree: 'Higher Diploma of Software Engineering', university: 'Aptech Worldwide', years: '2003-2005' }
+                ],
+                certs: [
+                    'MCPS: Microsoft Certified Professional',
+                    'MCTS: .NET Framework 4 (Multiple)',
+                    'Certificate of Scrum Product Owner Training',
+                    'Dr. Shu-Park Chan Scholarship Award',
+                    'Golden Key Award for Top 15% Students',
+                    'Aptech Scholarship for Distinction Students'
+                ]
+            };
+
+            const timelineContainer = document.querySelector('#timeline-container .flex, #timeline-container .grid');
+            const experienceDetails = document.getElementById('experience-details');
+            const summaryTextElement = document.getElementById('summary-text');
+            const generateSummaryBtn = document.getElementById('generate-summary-btn');
+            const summaryLoading = document.getElementById('summary-loading');
+            const rewriteModal = document.getElementById('rewriteModal');
+            const closeButton = document.querySelector('.close-button');
+            const rewrittenTextElement = document.getElementById('rewritten-text');
+            const rewriteLoading = document.getElementById('rewrite-loading');
+            const copyRewrittenTextBtn = document.getElementById('copy-rewritten-text-btn');
+            
+            async function callGeminiAPI(prompt) {
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await response.json();
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        return result.candidates[0].content.parts[0].text;
+                    } else {
+                        console.error('Unexpected API response structure:', result);
+                        return 'Error: Could not generate response.';
+                    }
+                } catch (error) {
+                    console.error('Error calling Gemini API:', error);
+                    return 'Error: Failed to connect to API.';
+                }
+            }
+
+            async function generateSummary() {
+                summaryLoading.classList.remove('hidden');
+                generateSummaryBtn.disabled = true;
+                const currentSummary = summaryTextElement.textContent;
+                const prompt = `Rewrite the following resume summary to be more impactful and concise, focusing on achievements and future contributions, for a Senior Software Engineer role. Keep it professional and within 100 words:\n\n${currentSummary}`;
+                const newSummary = await callGeminiAPI(prompt);
+                summaryTextElement.textContent = newSummary;
+                summaryLoading.classList.add('hidden');
+                generateSummaryBtn.disabled = false;
+            }
+
+            async function rewriteAchievement(originalText) {
+                rewriteModal.style.display = 'flex';
+                rewrittenTextElement.textContent = '';
+                rewriteLoading.classList.remove('hidden');
+                copyRewrittenTextBtn.disabled = true;
+
+                const prompt = `Rewrite the following resume achievement bullet point to be more impactful, quantifiable, and action-oriented. Focus on the result and impact. Provide only the rewritten bullet point, without any introductory phrases:\n\n${originalText}`;
+                const rewritten = await callGeminiAPI(prompt);
+                rewrittenTextElement.textContent = rewritten;
+                rewriteLoading.classList.add('hidden');
+                copyRewrittenTextBtn.disabled = false;
+            }
+
+            function updateExperienceDetails(index) {
+                const job = resumeData.experience[index];
+                experienceDetails.innerHTML = `
+                    <h3 class="text-2xl font-bold text-slate-900">${job.role}</h3>
+                    <p class="text-md font-semibold text-teal-600">${job.company} | ${job.location}</p>
+                    <p class="text-sm text-slate-500 mb-4">${job.duration}</p>
+                    <ul class="space-y-2 list-disc list-inside text-slate-600">
+                        ${job.details.map(detail => `
+                            <li class="flex items-start">
+                                <span class="flex-grow">${detail}</span>
+                                <button class="rewrite-btn ml-2 p-1 rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors text-xs" data-original-text="${detail}">✨</button>
+                            </li>
+                        `).join('')}
+                    </ul>
+                `;
+                document.querySelectorAll('.timeline-item').forEach((item, i) => {
+                    item.classList.toggle('active', i === index);
+                });
+
+                document.querySelectorAll('.rewrite-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const originalText = e.target.dataset.originalText;
+                        rewriteAchievement(originalText);
+                    });
+                });
+            }
+
+            resumeData.experience.forEach((job, index) => {
+                const item = document.createElement('div');
+                item.className = 'timeline-item cursor-pointer p-4 rounded-lg bg-white hover:bg-teal-500 hover:text-white transition-colors duration-300 shadow border border-slate-200';
+                item.innerHTML = `
+                    <p class="font-semibold text-lg">${job.company}</p>
+                    <p class="timeline-date text-sm text-slate-500">${job.duration}</p>
+                `;
+                item.addEventListener('click', () => updateExperienceDetails(index));
+                timelineContainer.appendChild(item);
+            });
+            
+            updateExperienceDetails(0);
+
+            const skillsFilterContainer = document.getElementById('skills-filter');
+            const skillCategories = Object.keys(resumeData.skills);
+            let activeSkillCategory = skillCategories[0];
+
+            const ctx = document.getElementById('skillsChart').getContext('2d');
+            const skillsChart = new Chart(ctx, {
+                type: 'polarArea',
+                data: {
+                    labels: resumeData.skills[activeSkillCategory].labels,
+                    datasets: [{
+                        data: resumeData.skills[activeSkillCategory].data,
+                        backgroundColor: [
+                            'rgba(13, 148, 136, 0.7)',
+                            'rgba(15, 118, 110, 0.7)',
+                            'rgba(19, 78, 74, 0.7)',
+                            'rgba(6, 78, 59, 0.7)',
+                            'rgba(107, 114, 128, 0.7)',
+                            'rgba(75, 85, 99, 0.7)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                           pointLabels: {
+                                display: true,
+                                centerPointLabels: true,
+                                font: {
+                                    size: 14
+                                }
+                           },
+                           ticks: {
+                                display: false
+                           }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: Competency Level`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            function updateSkillsChart(category) {
+                activeSkillCategory = category;
+                const newData = resumeData.skills[category];
+                skillsChart.data.labels = newData.labels;
+                skillsChart.data.datasets[0].data = newData.data;
+                skillsChart.update();
+
+                document.querySelectorAll('#skills-filter button').forEach(btn => {
+                    btn.classList.toggle('bg-teal-600', btn.textContent === category);
+                    btn.classList.toggle('text-white', btn.textContent === category);
+                    btn.classList.toggle('bg-white', btn.textContent !== category);
+                    btn.classList.toggle('text-slate-700', btn.textContent !== category);
+                });
+            }
+
+            skillCategories.forEach(category => {
+                const button = document.createElement('button');
+                button.textContent = category;
+                button.className = 'px-4 py-2 rounded-full text-sm font-medium border border-slate-300 transition-colors duration-300';
+                button.addEventListener('click', () => updateSkillsChart(category));
+                skillsFilterContainer.appendChild(button);
+            });
+
+            updateSkillsChart(activeSkillCategory);
+
+            const educationList = document.getElementById('education-list');
+            resumeData.education.forEach(edu => {
+                const item = document.createElement('div');
+                item.className = 'p-4 bg-white rounded-lg shadow-sm border border-slate-200';
+                item.innerHTML = `
+                    <p class="font-semibold text-slate-800">${edu.degree}</p>
+                    <p class="text-slate-600">${edu.university}</p>
+                    <p class="text-sm text-slate-500">${edu.years}</p>
+                `;
+                educationList.appendChild(item);
+            });
+            
+            const certsList = document.getElementById('certs-list');
+            resumeData.certs.forEach(cert => {
+                const item = document.createElement('div');
+                item.className = 'p-4 bg-white rounded-lg shadow-sm border border-slate-200';
+                item.innerHTML = `<p class="font-medium text-slate-700">${cert}</p>`;
+                certsList.appendChild(item);
+            });
+            
+            const navLinks = document.querySelectorAll('.nav-link');
+            const sections = document.querySelectorAll('section');
+            const mobileNav = document.getElementById('mobile-nav');
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.getAttribute('id');
+                        navLinks.forEach(link => {
+                            link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
+                        });
+                        mobileNav.value = `#${id}`;
+                    }
+                });
+            }, { rootMargin: '-50% 0px -50% 0px' });
+
+            sections.forEach(section => {
+                observer.observe(section);
+            });
+            
+            mobileNav.addEventListener('change', (e) => {
+                const targetId = e.target.value;
+                document.querySelector(targetId).scrollIntoView({ behavior: 'smooth' });
+            });
+
+            generateSummaryBtn.addEventListener('click', generateSummary);
+
+            closeButton.addEventListener('click', () => {
+                rewriteModal.style.display = 'none';
+            });
+
+            window.addEventListener('click', (event) => {
+                if (event.target === rewriteModal) {
+                    rewriteModal.style.display = 'none';
+                }
+            });
+
+            copyRewrittenTextBtn.addEventListener('click', () => {
+                const textToCopy = rewrittenTextElement.textContent;
+                try {
+                    const tempInput = document.createElement('textarea');
+                    tempInput.value = textToCopy;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempInput);
+                    alert('Copied to clipboard!');
+                } catch (err) {
+                    console.error('Failed to copy text: ', err);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
